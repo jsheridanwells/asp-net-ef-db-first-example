@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Net;
 using System.Threading.Tasks;
 using HsSports.Models;
 using Microsoft.AspNetCore.Mvc;
@@ -20,19 +21,38 @@ namespace HsSports.Controllers
         [HttpGet]
         public IActionResult GetCustomers()
         {
-            return new ObjectResult(_ctx.Customer);
+            var response =  new ObjectResult(_ctx.Customer)
+            {
+                StatusCode = (int)HttpStatusCode.OK
+            };
+
+            Request.HttpContext.Response.Headers.Add("X-Total-Count", _ctx.Customer.Count().ToString());
+
+            return response;
         } 
 
         [HttpGet("{id}", Name = "GetCustomer")]
         public async Task<IActionResult>  GetCustomer([FromRoute] int id)
         {
-            var customer = await _ctx.Customer.SingleOrDefaultAsync(c => c.CustomerId == id);
-            return Ok(customer);
+            if (CustomerExists(id))
+            {
+                var customer = await _ctx.Customer.SingleOrDefaultAsync(c => c.CustomerId == id);
+                return Ok(customer);
+            }
+            else 
+            {
+                return NotFound();
+            }
         }
+        
 
         [HttpPost]
         public async Task<IActionResult> CreateCustomer([FromBody] Customer customer)
         {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
             await _ctx.Customer.AddAsync(customer);
             await _ctx.SaveChangesAsync();
             return CreatedAtAction("GetCustomer", new { id = customer.CustomerId }, customer);
@@ -53,6 +73,11 @@ namespace HsSports.Controllers
             _ctx.Customer.Remove(customer);
             await _ctx.SaveChangesAsync();
             return Ok(customer);
+        }
+
+        private bool CustomerExists(int id)
+        {
+            return _ctx.Customer.Any(c => c.CustomerId == id);
         }
         
     }
