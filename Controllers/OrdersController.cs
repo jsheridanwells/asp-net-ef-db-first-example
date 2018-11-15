@@ -1,10 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+﻿using System.Linq;
 using System.Threading.Tasks;
-using HsSports.Models;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using HsSports.Models;
 
 namespace HPlusSportsAPI.Controllers
 {
@@ -12,40 +10,112 @@ namespace HPlusSportsAPI.Controllers
     [Route("api/Orders")]
     public class OrdersController : Controller
     {
-        private readonly H_Plus_SportsContext _ctx;
-        public OrdersController(H_Plus_SportsContext ctx)
+        private readonly H_Plus_SportsContext _context;
+
+        public OrdersController(H_Plus_SportsContext context)
         {
-            _ctx = ctx;
+            _context = context;
+        }
+
+        private bool OrderExists(int id)
+        {
+            return _context.Order.Any(e => e.OrderId == id);
         }
 
         [HttpGet]
+        [Produces(typeof(DbSet<Order>))]
         public IActionResult GetOrder()
         {
-            return Ok();
+            return new ObjectResult(_context.Order);
         }
 
         [HttpGet("{id}")]
-        public IActionResult GetOrder([FromRoute] int id)
+        [Produces(typeof(Order))]
+        public async Task<IActionResult> GetOrder([FromRoute] int id)
         {
-            return Ok();
-        }
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
 
-        [HttpPost]
-        public IActionResult PostOrder([FromBody] Object obj)
-        {
-            return Ok();
+            var order = await _context.Order.SingleOrDefaultAsync(m => m.OrderId == id);
+
+            if (order == null)
+            {
+                return NotFound();
+            }
+
+            return Ok(order);
         }
 
         [HttpPut("{id}")]
-        public IActionResult PutOrder([FromRoute] int id, [FromBody] Object obj)
+        [Produces(typeof(Order))]
+        public async Task<IActionResult> PutOrder([FromRoute] int id, [FromBody] Order order)
         {
-            return Ok();
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            if (id != order.OrderId)
+            {
+                return BadRequest();
+            }
+
+            _context.Entry(order).State = EntityState.Modified;
+
+            try
+            {
+                await _context.SaveChangesAsync();
+                return Ok(order);
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                if (!OrderExists(id))
+                {
+                    return NotFound();
+                }
+                else
+                {
+                    throw;
+                }
+            }
+        }
+
+        [HttpPost]
+        [Produces(typeof(Order))]
+        public async Task<IActionResult> PostOrder([FromBody] Order order)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            _context.Order.Add(order);
+            await _context.SaveChangesAsync();
+
+            return CreatedAtAction("GetOrder", new { id = order.OrderId }, order);
         }
 
         [HttpDelete("{id}")]
-        public IActionResult DeleteOrder([FromRoute] int id)
+        [Produces(typeof(Order))]
+        public async Task<IActionResult> DeleteOrder([FromRoute] int id)
         {
-            return Ok();
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            var order = await _context.Order.SingleOrDefaultAsync(m => m.OrderId == id);
+            if (order == null)
+            {
+                return NotFound();
+            }
+
+            _context.Order.Remove(order);
+            await _context.SaveChangesAsync();
+
+            return Ok(order);
         }
     }
 }
