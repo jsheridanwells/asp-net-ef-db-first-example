@@ -25,7 +25,7 @@ namespace H_Plus_Sports
             services.AddScoped<ICustomerRepository, CustomerRepository>();
             services.AddMvc();
 
-            var connection = "Server=tcp:hsportswells.database.windows.net,1433;Initial Catalog=H_Plus_Sports;Persist Security Info=False;User ID=hssportsadmin;Password=P@ssword1;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;";
+            var connection = Configuration.GetConnectionString("appDbConnection");
             services.AddDbContext<H_Plus_SportsContext>(options => options.UseSqlServer(connection));
         }
 
