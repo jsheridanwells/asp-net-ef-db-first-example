@@ -4,6 +4,8 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Net;
 using HsSports.Models;
+using HsSports.Contracts;
+using System.Collections.Generic;
 
 namespace HPlusSportsAPI.Controllers
 {
@@ -11,30 +13,30 @@ namespace HPlusSportsAPI.Controllers
     [Route("api/Customers")]
     public class CustomersController : Controller
     {
-        private readonly H_Plus_SportsContext _context;
+        private readonly ICustomerRepository _repo;
 
-        public CustomersController(H_Plus_SportsContext context)
+        public CustomersController(ICustomerRepository repository)
         {
-            _context = context;
+            _repo = repository;
         }
 
-        private bool CustomerExists(int id)
+        private async Task<bool> CustomerExists(int id)
         {
-            return _context.Customer.Any(e => e.CustomerId == id);
+            return await _repo.Exists(id);
         }
 
         [HttpGet]
         [Produces(typeof(DbSet<Customer>))]
         public IActionResult GetCustomer()
         {
-            var results = new ObjectResult(_context.Customer)
+            var results = new ObjectResult(_repo.GetAll())
             {
                 StatusCode = (int)HttpStatusCode.OK
-            };
+            };         
+        
+            Request.HttpContext.Response.Headers.Add("X-Total-Count", _repo.GetAll().Count().ToString());
 
-            Request.HttpContext.Response.Headers.Add("X-Total-Count", _context.Customer.Count().ToString());
-
-            return results;
+            return Ok(results);
         }
 
         [HttpGet("{id}")]
@@ -46,7 +48,7 @@ namespace HPlusSportsAPI.Controllers
                 return BadRequest(ModelState);
             }
 
-            var customer = await _context.Customer.SingleOrDefaultAsync(m => m.CustomerId == id);
+            var customer = await _repo.Find(id);
 
             if (customer == null)
             {
@@ -70,16 +72,16 @@ namespace HPlusSportsAPI.Controllers
                 return BadRequest();
             }
 
-            _context.Entry(customer).State = EntityState.Modified;
-
             try 
             {
-                await _context.SaveChangesAsync();
+                await _repo.Update(customer);
                 return Ok(customer);
             }
             catch (DbUpdateConcurrencyException)
             {
-                if (!CustomerExists(id))
+                bool exists = await CustomerExists(id);
+
+                if (!exists)
                 {
                     return NotFound();
                 }
@@ -99,8 +101,7 @@ namespace HPlusSportsAPI.Controllers
                 return BadRequest(ModelState);
             }
 
-            _context.Customer.Add(customer);
-            await _context.SaveChangesAsync();
+            await _repo.Add(customer);
 
             return CreatedAtAction("GetCustomer", new { id = customer.CustomerId }, customer);
         }
@@ -114,14 +115,13 @@ namespace HPlusSportsAPI.Controllers
                 return BadRequest(ModelState);
             }
 
-            var customer = await _context.Customer.SingleOrDefaultAsync(m => m.CustomerId == id);
+            var customer = await _repo.Find(id);
             if (customer == null)
             {
                 return NotFound();
             }
 
-            _context.Customer.Remove(customer);
-            await _context.SaveChangesAsync();
+            await _repo.Remove(id);
 
             return Ok(customer);
         }
