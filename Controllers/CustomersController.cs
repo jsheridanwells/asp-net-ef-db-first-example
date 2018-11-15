@@ -75,7 +75,7 @@ namespace HPlusSportsAPI.Controllers
             try 
             {
                 await _repo.Update(customer);
-                return Ok(customer);
+                return Ok();
             }
             catch (DbUpdateConcurrencyException)
             {
